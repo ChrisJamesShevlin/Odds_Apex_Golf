@@ -159,7 +159,7 @@ def calculate_score():
 # ------------------------
 
 root = tk.Tk()
-root.title("Odds Apex - Golf")
+root.title("Odds Apex - Golf Model")
 
 # Basic pre-event fields
 fields = [

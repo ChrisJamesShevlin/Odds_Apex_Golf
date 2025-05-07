@@ -4,7 +4,9 @@ from tkinter.scrolledtext import ScrolledText
 import re
 
 P_FLOOR = 0.02
-MAX_FAIR = 50.0
+EDGE_THRESHOLD_WEAK = 15
+EDGE_THRESHOLD_MEDIUM = 25
+EDGE_THRESHOLD_STRONG = 35
 
 def calculate_lays():
     output_txt.delete("1.0", tk.END)
@@ -18,8 +20,10 @@ def calculate_lays():
         messagebox.showerror("Input Error", "Please enter a positive number for your account balance.")
         return
 
-    cap_liability = 0.10 * bank
     all_players = []
+    lay_candidates = []
+    signal_groups = {"Strong": [], "Medium": [], "Weak": []}
+    cap_factors = {"Strong": 0.10, "Medium": 0.075, "Weak": 0.05}
 
     for line in lines:
         if "|" not in line or "LiveOdds" not in line:
@@ -31,57 +35,89 @@ def calculate_lays():
             m_mod  = re.search(r"Model[:%]?\s*([0-9]+(?:\.[0-9]+)?)%", stats)
             m_odds = re.search(r"LiveOdds[:]?[\s]*([0-9]+(?:\.[0-9]+)?)", stats)
             m_edge = re.search(r"Edge:\s*[+-]?([0-9]+(?:\.[0-9]+)?)%", stats)
+            m_ev   = re.search(r"EV:\s*[+-]?([0-9]+(?:\.[0-9]+)?)", stats)
 
-            if not (m_mod and m_odds and m_edge):
+            if not (m_mod and m_odds and m_edge and m_ev):
                 continue
 
             p_model = max(float(m_mod.group(1)) / 100.0, P_FLOOR)
             live_odds = float(m_odds.group(1))
-            edge_pct = float(m_edge.group(1))  # Already positive number
+            edge_pct = float(m_edge.group(1))
+            ev_value = float(m_ev.group(1))
 
             if live_odds <= 1:
                 continue
-
-            stake = cap_liability / (live_odds - 1)
 
             all_players.append({
                 "name": name,
                 "model_prob": p_model,
                 "live_odds": live_odds,
-                "stake_raw": stake,
-                "edge": edge_pct
+                "edge": edge_pct,
+                "ev": ev_value
             })
+
         except Exception:
             continue
 
     model_order = sorted(all_players, key=lambda x: x["model_prob"], reverse=True)
     market_order = sorted(all_players, key=lambda x: x["live_odds"])
 
-    output_txt.insert(tk.END, f"{'Name':<15} {'Model Rank':<12} {'Market Rank':<13} {'Stake (£)':<10} {'Signal'}\n")
-    output_txt.insert(tk.END, "-" * 75 + "\n")
-
     for p in all_players:
         model_rank = next((i + 1 for i, x in enumerate(model_order) if x["name"] == p["name"]), None)
         market_rank = next((i + 1 for i, x in enumerate(market_order) if x["name"] == p["name"]), None)
         rank_delta = model_rank - market_rank
-
         signal = ""
-        stake = 0.00
 
         if market_rank < model_rank:
-            stake = p["stake_raw"]
             edge = p["edge"]
+            if rank_delta >= 3 and edge >= EDGE_THRESHOLD_STRONG:
+                signal = "Strong"
+            elif rank_delta >= 2 and edge >= EDGE_THRESHOLD_MEDIUM:
+                signal = "Medium"
+            elif rank_delta >= 1 and edge >= EDGE_THRESHOLD_WEAK:
+                signal = "Weak"
 
-            if rank_delta >= 3 and edge >= 35:
-                signal = "Lay Mispricing (Strong)"
-            elif rank_delta >= 2 and edge >= 25:
-                signal = "Lay Mispricing (Medium)"
-            elif rank_delta >= 1 and edge >= 15:
-                signal = "Lay Mispricing (Weak)"
+            if signal:
+                signal_groups[signal].append({
+                    "name": p["name"],
+                    "model_rank": model_rank,
+                    "market_rank": market_rank,
+                    "live_odds": p["live_odds"],
+                    "edge": edge,
+                    "ev": p["ev"],
+                    "signal": f"Lay Mispricing ({signal})"
+                })
 
+    # EV-based stake allocation within signal groups
+    for signal_strength, players in signal_groups.items():
+        if not players:
+            continue
+
+        max_liability_per_player = cap_factors[signal_strength] * bank
+        total_ev = sum(p['ev'] for p in players)
+
+        for p in players:
+            ev_weight = p['ev'] / total_ev if total_ev > 0 else 0
+            allocated_liability = ev_weight * len(players) * max_liability_per_player
+            stake = allocated_liability / (p["live_odds"] - 1)
+
+            lay_candidates.append({
+                "name": p["name"],
+                "model_rank": p["model_rank"],
+                "market_rank": p["market_rank"],
+                "signal": p["signal"],
+                "stake": stake,
+                "liability": allocated_liability
+            })
+
+    # Output
+    output_txt.insert(tk.END, f"{'Name':<15} {'Model Rank':<12} {'Market Rank':<13} {'Stake (£)':<10} {'Liability (£)':<15} {'Signal'}\n")
+    output_txt.insert(tk.END, "-" * 95 + "\n")
+
+    for p in lay_candidates:
         output_txt.insert(
             tk.END,
-            f"{p['name']:<15} {model_rank:<12} {market_rank:<13} £{stake:<9.2f} {signal}\n"
+            f"{p['name']:<15} {p['model_rank']:<12} {p['market_rank']:<13} £{p['stake']:<9.2f} £{p['liability']:<14.2f} {p['signal']}\n"
         )
 
 # GUI setup

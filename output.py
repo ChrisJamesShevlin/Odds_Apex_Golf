@@ -85,7 +85,7 @@ def calculate_lays():
                     "live_odds": p["live_odds"],
                     "edge": edge,
                     "ev": p["ev"],
-                    "signal": f"Lay Mispricing ({signal})"
+                    "signal": signal
                 })
 
     # EV-based stake allocation within signal groups
@@ -105,19 +105,20 @@ def calculate_lays():
                 "name": p["name"],
                 "model_rank": p["model_rank"],
                 "market_rank": p["market_rank"],
+                "ev": p["ev"],
                 "signal": p["signal"],
                 "stake": stake,
                 "liability": allocated_liability
             })
 
     # Output
-    output_txt.insert(tk.END, f"{'Name':<15} {'Model Rank':<12} {'Market Rank':<13} {'Stake (£)':<10} {'Liability (£)':<15} {'Signal'}\n")
-    output_txt.insert(tk.END, "-" * 95 + "\n")
+    output_txt.insert(tk.END, f"{'Name':<15} {'Model Rank':<12} {'Market Rank':<13} {'EV':<8} {'Stake (£)':<10} {'Liability (£)':<15} {'Signal'}\n")
+    output_txt.insert(tk.END, "-" * 110 + "\n")
 
     for p in lay_candidates:
         output_txt.insert(
             tk.END,
-            f"{p['name']:<15} {p['model_rank']:<12} {p['market_rank']:<13} £{p['stake']:<9.2f} £{p['liability']:<14.2f} {p['signal']}\n"
+            f"{p['name']:<15} {p['model_rank']:<12} {p['market_rank']:<13} {p['ev']:<8.3f} £{p['stake']:<9.2f} £{p['liability']:<14.2f} {p['signal']}\n"
         )
 
 # GUI setup

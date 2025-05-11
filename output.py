@@ -12,8 +12,8 @@ CAP_FACTORS = {
 
 # Delta→signal thresholds
 DELTA_THRESHOLDS = {
-    "Strong": 5, 
-    "Medium": 3, 
+    "Strong": 5,
+    "Medium": 3,
     "Weak":   1
 }
 
@@ -95,25 +95,27 @@ def calculate_lays():
             p["liability"] = None
 
     # Build and print the table
-    header = "{:<12}{:>5}{:>5}{:>5}{:>5}{:>7}{:>7}{:>7}{:>7}{:>8}{:>8}\n".format(
-        "Player", "Sc", "Md", "Mk", "Δ", "Signal", "Odds", "Edge", "EV", "Stake", "Liab"
+    header = "{:<12}{:>5}{:>5}{:>5}{:>5}{:>5}{:>7}{:>7}{:>7}{:>7}{:>8}{:>8}\n".format(
+        "Player", "Sc", "Md%", "Mk%", "MPos", "MkPos", "Δ", "Signal", "Odds", "Edge", "AbsEV", "Stake", "Liab"
     )
     output_txt.insert(tk.END, header)
-    output_txt.insert(tk.END, "-" * len(header) + "\n")
+    output_txt.insert(tk.END, "-" * (len(header)-1) + "\n")
 
     for p in sorted(players, key=lambda x: x["delta"], reverse=True):
         stk = f"{p['stake']:.2f}"     if p["stake"]     is not None else ""
         lia = f"{p['liability']:.2f}" if p["liability"] is not None else ""
-        line = "{:<12}{:>5.0f}{:>5.0f}{:>5.0f}{:>5d}{:>7}{:>7.2f}{:>7.2f}{:>7.2f}{:>8}{:>8}\n".format(
+        line = "{:<12}{:>5.0f}{:>5.0f}{:>5.0f}{:>5d}{:>7d}{:>5d}{:>7}{:>7.2f}{:>7.2f}{:>8.2f}{:>8}{:>8}\n".format(
             p["name"],
             p["score"],
             p["model_p"],
             p["market_p"],
+            p["mod_rank"],
+            p["mkt_rank"],
             p["delta"],
             p["signal"] or "",
             p["odds"],
             p["edge"],
-            p["ev"],
+            abs(p["ev"]),       # display absolute EV
             stk,
             lia
         )
@@ -127,7 +129,7 @@ FONT = ("Courier New", 11)
 
 tk.Label(root, text="Paste model output below:", font=FONT)\
     .grid(row=0, column=0, padx=5, pady=5)
-input_txt = ScrolledText(root, width=120, height=8, font=FONT)
+input_txt = ScrolledText(root, width=135, height=8, font=FONT)
 input_txt.grid(row=1, column=0, columnspan=2)
 
 tk.Label(root, text="Bankroll £:", font=FONT)\
@@ -138,7 +140,7 @@ balance_entry.grid(row=2, column=1, sticky="w")
 tk.Button(root, text="Calculate", command=calculate_lays, font=FONT)\
     .grid(row=3, column=0, columnspan=2, pady=8)
 
-output_txt = ScrolledText(root, width=120, height=15, font=FONT)
+output_txt = ScrolledText(root, width=135, height=15, font=FONT)
 output_txt.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
 
 root.mainloop()
